@@ -208,14 +208,30 @@ class Cache:
         return 0  # fallback (nao deveria ocorrer)
 
     def _lru_install(self, set_idx: int, way: int, tag: int) -> None:
+        """Instala um bloco novo na via 'way'. Como e' insercao (nao
+        promocao), TODAS as outras linhas validas envelhecem (lru_pos+=1)
+        antes da nova entrar como MRU.
+
+        Importante: a distincao entre _lru_install e _lru_promote e' critica.
+        Na promocao (hit), so envelhecem as linhas que estavam mais novas
+        que a vitima. Na instalacao (miss), a via que vai receber o bloco
+        e' nova - todas as validas anteriores envelhecem em relacao a ela.
+        """
         cache_set = self.sets[set_idx]
+        # Envelhece todas as VALIDAS que ja estao no set (antes de marcar a
+        # nova como valida).
+        for ln in cache_set:
+            if ln.valid and ln.lru_pos < self.assoc - 1:
+                ln.lru_pos += 1
+        # Marca a nova como valida e MRU.
         cache_set[way].valid = True
         cache_set[way].tag = tag
-        # Promove vencedor para MRU.
-        self._lru_promote(set_idx, way)
+        cache_set[way].lru_pos = 0
 
     def _lru_promote(self, set_idx: int, way: int) -> None:
-        """Move a via 'way' para topo do stack LRU (pos 0)."""
+        """Hit: move a via 'way' para topo do stack LRU (pos 0).
+        So envelhecem as linhas que estavam MAIS NOVAS que 'way'
+        (lru_pos < old_pos do way)."""
         cache_set = self.sets[set_idx]
         old_pos = cache_set[way].lru_pos
         for ln in cache_set:

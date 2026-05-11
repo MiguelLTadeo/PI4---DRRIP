@@ -18,15 +18,22 @@ from cache_model import MemoryHierarchy
 from traces import BENCHMARKS
 
 
-# Configuracoes a testar (todas dentro do range da especificacao secao 4)
+# Configuracoes a testar.
+# IMPORTANTE: DRRIP so' supera LRU quando o working set EXCEDE a cache.
+# Por isso incluimos configs pequenas (stress) e tambem as do range da
+# especificacao (que mostram caso onde ambos sao equivalentes).
 # (l1d_size, l1d_assoc, l2_size, l2_assoc)
 CONFIGS = [
-    # nome,         L1_size, L1_assoc, L2_size, L2_assoc
-    ('A_min',       4 * 1024,  2, 32 * 1024,    8),
-    ('B_l1_4way',   4 * 1024,  4, 32 * 1024,    8),
-    ('C_l2_16way',  4 * 1024,  4, 32 * 1024,   16),
-    ('D_l2_64k',    4 * 1024,  4, 64 * 1024,   16),
-    ('E_max',       8 * 1024,  4, 128 * 1024,  16),
+    # nome,           L1_size,  L1_assoc, L2_size,    L2_assoc
+    # --- Caches pequenas (stress test - DRRIP deveria ganhar) ---
+    ('stress_tiny',    1024,     2,        4 * 1024,    4),
+    ('stress_small',   2048,     2,        8 * 1024,    4),
+    # --- Configs do range da especificacao ---
+    ('A_min',          4 * 1024, 2,        32 * 1024,   8),
+    ('B_l1_4way',      4 * 1024, 4,        32 * 1024,   8),
+    ('C_l2_16way',     4 * 1024, 4,        32 * 1024,  16),
+    ('D_l2_64k',       4 * 1024, 4,        64 * 1024,  16),
+    ('E_max',          8 * 1024, 4,        128 * 1024, 16),
 ]
 
 L1_BLOCK = 32   # especificacao
