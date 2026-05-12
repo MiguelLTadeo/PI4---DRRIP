@@ -287,24 +287,167 @@ def plot_mixed_access_zoom(rows, out_path):
 # =============================================================================
 # main
 # =============================================================================
+def _hit_rate_global(l1_hit: float, l2_hit: float) -> float:
+    """Hit rate global da hierarquia: 1 - (1-h_L1)*(1-h_L2).
+ 
+    Significa: fração dos acessos da CPU que NÃO foram até a memória
+    principal — capturados em L1 ou em L2.
+    """
+    return 1.0 - (1.0 - l1_hit) * (1.0 - l2_hit)
+ 
+ 
+def plot_summary_table_image(rows, out_path: str):
+    """Gera uma figura PNG com a tabela-resumo no formato:
+ 
+        | Trace | LRU-L1 | LRU-Global | DRRIP-L1 | DRRIP-Global | Δ L1 | Interpretação |
+ 
+    Cada linha agrega as 3 configs por média. A coluna 'Interpretação'
+    explica em uma frase curta o que está acontecendo, no estilo
+    didático adotado por outras equipes da disciplina.
+    """
+    by_bench = defaultdict(lambda: {"LRU": [], "DRRIP": []})
+    for r in rows:
+        by_bench[r["benchmark"]][r["policy"]].append(r)
+ 
+    bench_order = [
+        "streaming_hotset",
+        "matrix_conv",
+        "linked_list",
+        "pattern_search",
+        "mixed_access",
+    ]
+ 
+    # Frase curta por benchmark — coluna "Interpretação"
+    interp = {
+        "streaming_hotset":
+            "Empate; localidade\nintra-bloco satura",
+        "matrix_conv":
+            "Empate; reuso vertical\n3×1 cabe na cache",
+        "linked_list":
+            "Empate em L1; DRRIP\nmelhora L2 em Config C",
+        "pattern_search":
+            "Empate; janela cabe\nem um conjunto",
+        "mixed_access":
+            "DRRIP preserva working\nset durante o scan",
+    }
+ 
+    # Calcula médias entre configs
+    def avg(items, key):
+        return sum(float(r[key]) for r in items) / len(items)
+ 
+    def hit_global_avg(items):
+        l1s = [float(r["l1d_hit_rate"]) for r in items]
+        l2s = [float(r["l2_hit_rate"]) for r in items]
+        gs = [_hit_rate_global(l1, l2) for l1, l2 in zip(l1s, l2s)]
+        return sum(gs) / len(gs)
+ 
+    table_rows = []
+    for bench in bench_order:
+        lru_items = by_bench[bench]["LRU"]
+        dr_items = by_bench[bench]["DRRIP"]
+ 
+        lru_l1 = avg(lru_items, "l1d_hit_rate") * 100
+        dr_l1 = avg(dr_items, "l1d_hit_rate") * 100
+        lru_g = hit_global_avg(lru_items) * 100
+        dr_g = hit_global_avg(dr_items) * 100
+        delta_l1 = dr_l1 - lru_l1
+ 
+        table_rows.append({
+            "trace": bench,
+            "lru_l1": f"{lru_l1:.2f}%",
+            "lru_g":  f"{lru_g:.2f}%",
+            "dr_l1":  f"{dr_l1:.2f}%",
+            "dr_g":   f"{dr_g:.2f}%",
+            "delta":  f"{delta_l1:+.2f}",
+            "interp": interp[bench],
+            "highlight": abs(delta_l1) >= 0.1,
+        })
+ 
+    # Renderiza como figura matplotlib
+    fig, ax = plt.subplots(figsize=(14, 4.5))
+    ax.axis("off")
+ 
+    header = ["Trace", "LRU - L1", "LRU - Global",
+              "DRRIP - L1", "DRRIP - Global",
+              "Δ L1 (pp)", "Interpretação"]
+    cells = [
+        [r["trace"], r["lru_l1"], r["lru_g"], r["dr_l1"], r["dr_g"],
+         r["delta"], r["interp"]]
+        for r in table_rows
+    ]
+ 
+    tbl = ax.table(
+        cellText=cells,
+        colLabels=header,
+        loc="center",
+        cellLoc="center",
+        colWidths=[0.14, 0.10, 0.12, 0.11, 0.12, 0.10, 0.31],
+    )
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(10)
+    tbl.scale(1, 2.0)
+ 
+    # Cabeçalho azul-escuro, fonte branca (estilo do colega)
+    header_color = "#1f3a93"
+    for c in range(len(header)):
+        cell = tbl[(0, c)]
+        cell.set_facecolor(header_color)
+        cell.set_text_props(color="white", fontweight="bold")
+        cell.set_edgecolor("white")
+ 
+    # Linhas zebra + destaque da linha onde DRRIP ganha
+    for i, row in enumerate(table_rows, start=1):
+        if row["highlight"]:
+            bg = "#fff3a3"          # amarelo claro — destaca a linha de ganho
+            txt_color_delta = "#1b7f1b"   # verde forte no delta
+        elif i % 2 == 0:
+            bg = "#e8eef9"
+            txt_color_delta = "#666666"
+        else:
+            bg = "white"
+            txt_color_delta = "#666666"
+ 
+        for c in range(len(header)):
+            cell = tbl[(i, c)]
+            cell.set_facecolor(bg)
+            cell.set_edgecolor("#bbbbbb")
+            if c == 5:  # coluna do delta
+                cell.set_text_props(
+                    color=txt_color_delta,
+                    fontweight="bold" if row["highlight"] else "normal",
+                )
+            if c == 0:  # coluna do trace
+                cell.set_text_props(fontweight="bold")
+ 
+    ax.set_title(
+        "Tabela geral dos resultados — LRU vs DRRIP\n"
+        "Hit rate L1 e Global (média entre Configs A, B, C)",
+        fontsize=13, fontweight="bold", pad=12,
+    )
+ 
+    fig.tight_layout()
+    fig.savefig(out_path, bbox_inches="tight", dpi=140)
+    plt.close(fig)
+ 
 
 def main():
     rows = load_csv("results/hit_rates.csv")
     overhead = load_csv("results/overhead.csv")
-
+ 
     out_dir = "results/plots"
     os.makedirs(out_dir, exist_ok=True)
-
+ 
     plot_hit_rate_bars(rows, "l1d", os.path.join(out_dir, "01_hit_rate_l1.png"))
     plot_hit_rate_bars(rows, "l2",  os.path.join(out_dir, "02_hit_rate_l2.png"))
     plot_amat(rows,                  os.path.join(out_dir, "03_amat.png"))
     plot_overhead(overhead,          os.path.join(out_dir, "04_overhead.png"))
     plot_mixed_access_zoom(rows,     os.path.join(out_dir, "05_mixed_access_zoom.png"))
-
+    plot_summary_table_image(rows,   os.path.join(out_dir, "06_summary_table.png"))
+ 
     print(f"Gráficos gerados em {out_dir}/")
     for name in sorted(os.listdir(out_dir)):
         print(f"  - {name}")
-
-
+ 
+ 
 if __name__ == "__main__":
     main()
