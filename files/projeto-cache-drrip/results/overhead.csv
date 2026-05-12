@@ -1,0 +1,7 @@
+cache,size_KB,block_B,assoc,LRU_total_bits,DRRIP_total_bits,LRU_policy_bits_per_set,DRRIP_policy_bits_per_set,savings_%
+L1D-A,4,32,2,2944,3082,2,4,-4.69
+L2-A,32,64,8,12288,11786,24,16,+4.09
+L1D-B,4,32,4,3200,3210,8,8,-0.31
+L2-B,64,64,8,23552,22538,24,16,+4.31
+L1D-C,8,32,4,6144,6154,8,8,-0.16
+L2-C,128,64,16,49152,45066,64,32,+8.31
