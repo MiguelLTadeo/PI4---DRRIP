@@ -9,6 +9,7 @@ e produz gráficos comparativos:
   plots/03_amat.png              AMAT
   plots/04_overhead.png          bits de SRAM por política
   plots/05_mixed_access_zoom.png zoom no benchmark favorável ao DRRIP
+  plots/06_hit_rates_table.png   tabela com a média dos hit rates e deltas
 
 Único requisito: matplotlib.
 """
@@ -260,6 +261,102 @@ def plot_mixed_access_zoom(rows, out_path):
 
 
 # -----------------------------------------------------------------------------
+def plot_summary_table(rows, out_path):
+    """Calcula médias das configs e plota tabela comparativa formatada em PNG."""
+    data = defaultdict(lambda: defaultdict(lambda: {'l1': [], 'l2': []}))
+
+    for r in rows:
+        bench = r["benchmark"]
+        pol = r["policy"]
+        data[bench][pol]['l1'].append(float(r["l1_hit_rate"]))
+        data[bench][pol]['l2'].append(float(r["l2_hit_rate"]))
+
+    benchmarks = ["streaming_hotset", "matrix_conv", "linked_list", "pattern_search", "mixed_access"]
+    policies = ["LRU", "DRRIP_jaleel", "DRRIP_champsim"]
+
+    columns = [
+        "TRACE",
+        "LRU\nL1", "LRU\nL2",
+        "DRRIP\nL1", "DRRIP\nL2",
+        "CHAMPSIM\nL1", "CHAMPSIM\nL2",
+        "Δ L1\nDRRIP", "Δ L1\nCHAMPSIM"
+    ]
+
+    cell_text = []
+    cell_colors = []
+
+    for b in benchmarks:
+        row_data = [b]
+        row_colors = ["#1f2937"] 
+
+        means = {}
+        for p in policies:
+            l1_mean = (sum(data[b][p]['l1']) / len(data[b][p]['l1'])) * 100 if data[b][p]['l1'] else 0
+            l2_mean = (sum(data[b][p]['l2']) / len(data[b][p]['l2'])) * 100 if data[b][p]['l2'] else 0
+            means[p] = {'l1': l1_mean, 'l2': l2_mean}
+
+            row_data.extend([f"{l1_mean:.2f}%", f"{l2_mean:.2f}%"])
+            row_colors.extend(["#2d3748", "#2d3748"])
+
+        delta_jaleel = means["DRRIP_jaleel"]["l1"] - means["LRU"]["l1"]
+        delta_champsim = means["DRRIP_champsim"]["l1"] - means["LRU"]["l1"]
+
+        row_data.extend([f"{delta_jaleel:+.2f}", f"{delta_champsim:+.2f}"])
+
+        for delta in [delta_jaleel, delta_champsim]:
+            if delta > 0.5:
+                row_colors.append("#065f46") 
+            elif delta < -0.5:
+                row_colors.append("#7f1d1d") 
+            else:
+                row_colors.append("#2d3748")
+
+        cell_text.append(row_data)
+        cell_colors.append(row_colors)
+
+    fig, ax = plt.subplots(figsize=(14, 3.5)) 
+    ax.axis('tight')
+    ax.axis('off') 
+
+    table = ax.table(
+        cellText=cell_text,
+        colLabels=columns,
+        cellColours=cell_colors,
+        loc='center',
+        cellLoc='center'
+    )
+
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1.0, 2.0) 
+
+    for (row, col), cell in table.get_celld().items():
+        cell.set_edgecolor('#4b5563') 
+        if row == 0:
+            cell.set_facecolor("#1e3a8a") 
+            cell.set_text_props(weight='bold', color='white', fontsize=10)
+        else:
+            texto = cell.get_text().get_text()
+            if col >= 7 and row > 0: 
+                try:
+                    val = float(texto)
+                    if val > 0:
+                        cell.set_text_props(color='#34d399', weight='bold') 
+                    elif val < 0:
+                        cell.set_text_props(color='#f87171', weight='bold') 
+                    else:
+                        cell.set_text_props(color='#d1d5db')
+                except ValueError:
+                    cell.set_text_props(color='#d1d5db')
+            else:
+                cell.set_text_props(color='#f3f4f6') 
+
+    fig.tight_layout()
+    fig.savefig(out_path, bbox_inches="tight", dpi=200, facecolor='#111827')
+    plt.close(fig)
+
+
+# -----------------------------------------------------------------------------
 def main():
     hit_rows = load_csv("results/hit_rates.csv")
     ov_rows = load_csv("results/overhead.csv")
@@ -270,6 +367,9 @@ def main():
     plot_amat(hit_rows,            "plots/03_amat.png")
     plot_overhead(ov_rows,         "plots/04_overhead.png")
     plot_mixed_access_zoom(hit_rows, "plots/05_mixed_access_zoom.png")
+    
+    # Adicionando a sua tabela à pipeline!
+    plot_summary_table(hit_rows,   "plots/06_hit_rates_table.png")
 
     print("Gráficos gerados:")
     for f in sorted(os.listdir("plots")):

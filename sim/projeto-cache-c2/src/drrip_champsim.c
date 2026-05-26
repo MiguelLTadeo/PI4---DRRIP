@@ -39,7 +39,7 @@ void drrip_champsim_init(drrip_champsim_t *d, cache_t *c) {
     size_t TOTAL_SDM_SETS = CSIM_NUM_CPUS * CSIM_NUM_POLICY * CSIM_SDM_SIZE;
     uint32_t state = 1;   /* knuth_b{1} -> seed = 1 */
     for (size_t i = 0; i < TOTAL_SDM_SETS; i++) {
-        d->rand_sets[i] = knuth_b_proxy(&state);
+        d->rand_sets[i] = knuth_b_proxy(&state) % c->num_sets;;
     }
     qsort(d->rand_sets, TOTAL_SDM_SETS, sizeof(size_t), size_t_cmp);
 }
