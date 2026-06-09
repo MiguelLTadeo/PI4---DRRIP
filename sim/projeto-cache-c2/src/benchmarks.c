@@ -131,3 +131,23 @@ ssize_t gen_mixed_access(uint64_t *buf, size_t cap,
     }
     return (ssize_t)n;
 }
+
+ssize_t gen_validation(uint64_t *buf, size_t cap) {
+    /* Sequencia hardcoded para validacao manual da Config TINY:
+     * 8 acessos, todos no set 0 da TINY (4 sets, 2 vias).
+     * Permite rastrear cada acesso na mao e comparar com o simulador. */
+    static const uint64_t trace[] = {
+        0x00000000,  /* set 0, tag A — miss, install way 0 */
+        0x00000040,  /* set 0, tag B — miss, install way 1 */
+        0x00000000,  /* set 0, tag A — HIT way 0           */
+        0x00000080,  /* set 0, tag C — miss, evicta um     */
+        0x00000000,  /* set 0, tag A — HIT ou miss?        */
+        0x000000C0,  /* set 0, tag D — miss                */
+        0x00000000,  /* set 0, tag A — HIT ou miss?        */
+        0x00000040,  /* set 0, tag B — HIT ou miss?        */
+    };
+    const size_t n = sizeof(trace) / sizeof(trace[0]);
+    if (n > cap) return -1;
+    for (size_t i = 0; i < n; i++) buf[i] = trace[i];
+    return (ssize_t)n;
+}

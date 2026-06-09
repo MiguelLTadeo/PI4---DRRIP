@@ -25,5 +25,6 @@ ssize_t gen_pattern_search(uint64_t *buf, size_t cap,
 ssize_t gen_mixed_access(uint64_t *buf, size_t cap,
                           int ws_blocks, int scan_blocks,
                           int ws_repeats, int outer_iters);
+ssize_t gen_validation(uint64_t *buf, size_t cap);
 
 #endif
