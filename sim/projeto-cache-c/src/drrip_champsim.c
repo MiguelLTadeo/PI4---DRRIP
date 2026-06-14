@@ -39,7 +39,7 @@ void drrip_champsim_init(drrip_champsim_t *d, cache_t *c) {
     size_t TOTAL_SDM_SETS = CSIM_NUM_CPUS * CSIM_NUM_POLICY * CSIM_SDM_SIZE;
     uint32_t state = 1;   /* knuth_b{1} -> seed = 1 */
     for (size_t i = 0; i < TOTAL_SDM_SETS; i++) {
-        d->rand_sets[i] = knuth_b_proxy(&state);
+        d->rand_sets[i] = knuth_b_proxy(&state) % c->num_sets;;
     }
     qsort(d->rand_sets, TOTAL_SDM_SETS, sizeof(size_t), size_t_cmp);
 }
@@ -123,24 +123,17 @@ int drrip_champsim_access(drrip_champsim_t *d, uint64_t addr) {
     int leader = find_in_rand_sets(d, (size_t)set_idx, begin, end);
 
     if (leader == end) {
-        /* follower */
-        if (d->psel > CSIM_PSEL_MAX / 2) {
-            update_bip(d, set_idx, victim);
-        } else {
-            update_srrip(d, set_idx, victim);
-        }
-    } else if (leader == begin) {
-        /* leader 0: BIP. PSEL-- */
+        /* follower: PSEL decide */
+        if (d->psel > CSIM_PSEL_MAX / 2) update_bip(d, set_idx, victim);
+        else                              update_srrip(d, set_idx, victim);
+    } else if (leader < begin + CSIM_SDM_SIZE) {
+        /* BIP SDM — primeiras CSIM_SDM_SIZE posições [begin, begin+SDM_SIZE) */
         if (d->psel > 0) d->psel--;
         update_bip(d, set_idx, victim);
-    } else if (leader == begin + 1) {
-        /* leader 1: SRRIP. PSEL++ */
+    } else {
+        /* SRRIP SDM — últimas CSIM_SDM_SIZE posições [begin+SDM_SIZE, end) */
         if (d->psel < CSIM_PSEL_MAX) d->psel++;
         update_srrip(d, set_idx, victim);
-    } else {
-        /* Outros leaders são tratados como followers no ChampSim original */
-        if (d->psel > CSIM_PSEL_MAX / 2) update_bip(d, set_idx, victim);
-        else update_srrip(d, set_idx, victim);
     }
     return 0;
 }

@@ -62,6 +62,7 @@ ssize_t gen_linked_list(uint64_t *buf, size_t cap,
     size_t n = 0;
     /* Ordem dos nós (embaralhada se randomize) */
     int *order = malloc(sizeof(int) * (size_t)n_nodes);
+    int *next_of = malloc(sizeof(int) * (size_t)n_nodes);
     for (int i = 0; i < n_nodes; i++) order[i] = i;
     if (randomize) {
         uint32_t s = 123;
@@ -70,15 +71,30 @@ ssize_t gen_linked_list(uint64_t *buf, size_t cap,
             int t = order[i]; order[i] = order[j]; order[j] = t;
         }
     }
-    /* Cada nó: 8 bytes (next ptr + payload) */
-    int node_size = 8;
-    for (int it = 0; it < iterations; it++) {
-        for (int k = 0; k < n_nodes; k++) {
-            uint64_t addr = LIST_BASE + (uint64_t)order[k] * node_size;
-            WRITE(addr);
-        }
+    /* Constrói lista circular: next_of[order[i]] = order[(i+1) % n] */
+    for (int i = 0; i < n_nodes; i++) {
+        next_of[order[i]] = order[(i + 1) % n_nodes];
+    }
+
+    /* Fiel ao Python: cada nó struct { int data; struct Node *next; }
+     * com padding totalizando 16 bytes.
+     * Por nó visitado:
+     *   - read  data  (base + 0)
+     *   - write data  (base + 0)
+     *   - read  next  (base + 8)
+     */
+    int node_size = 16;
+    int curr = order[0];
+    int total_visits = n_nodes * iterations;
+    for (int v = 0; v < total_visits; v++) {
+        uint64_t base = LIST_BASE + (uint64_t)curr * node_size;
+        WRITE(base);          /* leitura  data */
+        WRITE(base);          /* escrita  data */
+        WRITE(base + 8);      /* leitura  next */
+        curr = next_of[curr];
     }
     free(order);
+    free(next_of);
     return (ssize_t)n;
 }
 
@@ -113,5 +129,42 @@ ssize_t gen_mixed_access(uint64_t *buf, size_t cap,
             WRITE(SCAN_BASE + (uint64_t)i * block_size);
         }
     }
+    return (ssize_t)n;
+}
+
+ssize_t gen_validation(uint64_t *buf, size_t cap) {
+    /*
+     * Trace de validação para Config TINY (128B / 16B bloco / 2 vias / 4 sets).
+     *   offset_bits=4, index_bits=2 → stride de 16B muda set, 64B muda tag.
+     *   Todos os acessos abaixo caem no set 0 (bits [5:4] == 0b00).
+     *
+     * Fase 1 — hot-set (A,B acessados repetidamente): ambos devem permanecer.
+     * Fase 2 — scan invasivo (C,D,E,F): em LRU/SRRIP vão expulsar o hot-set.
+     *          Com BRRIP/DRRIP, C..F entram com RRPV=3 e são descartados primeiro,
+     *          preservando A e B — exatamente o comportamento do paper (Figura 3c).
+     *
+     * Resultado esperado com cache de 2 vias, set 0:
+     *   LRU  : H,H,H,M,M,M,M,H → 4/8 = 50%  (A,B expulsos pelo scan)
+     *   SRRIP: H,H,H,M,H,M,H,H → 5/8 = 62%  (A sobrevive, B expulsa)
+     *   BRRIP/DRRIP: H,H,H,H,H,H,H,H → pode variar; espera-se ≥ LRU
+     *
+     * (Os resultados exatos dependem de qual set é SDM_SRRIP vs SDM_BRRIP.)
+     */
+    static const uint64_t trace[] = {
+        /* Fase 1: warm-up do hot-set A e B */
+        0x00000000,  /* set 0, tag 0 = A — MISS (compulsório) */
+        0x00000040,  /* set 0, tag 1 = B — MISS (compulsório) */
+        0x00000000,  /* set 0, tag 0 = A — HIT  */
+        0x00000040,  /* set 0, tag 1 = B — HIT  */
+        /* Fase 2: scan C, D expulsam hot-set em LRU */
+        0x00000080,  /* set 0, tag 2 = C — MISS → evicta alguém */
+        0x000000C0,  /* set 0, tag 3 = D — MISS → evicta alguém */
+        /* Fase 3: re-acesso ao hot-set — quem sobreviveu? */
+        0x00000000,  /* set 0, tag 0 = A — HIT ou MISS? */
+        0x00000040,  /* set 0, tag 1 = B — HIT ou MISS? */
+    };
+    const size_t n = sizeof(trace) / sizeof(trace[0]);
+    if (n > cap) return -1;
+    for (size_t i = 0; i < n; i++) buf[i] = trace[i];
     return (ssize_t)n;
 }

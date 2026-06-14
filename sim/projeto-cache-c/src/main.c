@@ -35,6 +35,7 @@ static const cache_config_t CONFIGS[] = {
     {"A",  4*1024, 32, 2,  32*1024, 64, 8},
     {"B",  4*1024, 32, 4,  64*1024, 64, 8},
     {"C",  8*1024, 32, 4, 128*1024, 64, 16},
+    {"Validacao",     128, 16, 2,    1024, 16, 2},
 };
 #define N_CONFIGS (sizeof(CONFIGS)/sizeof(CONFIGS[0]))
 
@@ -48,14 +49,18 @@ static uint64_t trace_buf[TRACE_CAP];
 /* Gera trace de um benchmark; retorna número de acessos */
 static ssize_t generate_trace(const char *bench, const cache_config_t *cfg) {
     size_t l2_bytes = (size_t)cfg->l2_size;
+
+    if (!strcmp(bench, "Validacao"))
+        return gen_validation(trace_buf, TRACE_CAP);
+
     if (!strcmp(bench, "streaming_hotset"))
         return gen_streaming_hotset(trace_buf, TRACE_CAP,
                                      2 * l2_bytes, 3);
     if (!strcmp(bench, "matrix_conv"))
         return gen_matrix_conv(trace_buf, TRACE_CAP, 128, 128);
     if (!strcmp(bench, "linked_list"))
-        return gen_linked_list(trace_buf, TRACE_CAP,
-                                (int)(l2_bytes / 8), 3, 1);
+        /* Fiel ao Python: 8000 nós, 5 iterações, ordem aleatória */
+        return gen_linked_list(trace_buf, TRACE_CAP, 8000, 5, 1);
     if (!strcmp(bench, "pattern_search"))
         return gen_pattern_search(trace_buf, TRACE_CAP, l2_bytes, 32);
     if (!strcmp(bench, "mixed_access"))
@@ -140,7 +145,8 @@ static int total_storage_bits(const cache_t *c, policy_kind_t pol) {
 int main(void) {
     const char *benches[] = {
         "streaming_hotset", "matrix_conv", "linked_list",
-        "pattern_search",   "mixed_access"
+        "pattern_search",   "mixed_access",
+        "Validacao"
     };
     int n_benches = sizeof(benches) / sizeof(benches[0]);
 

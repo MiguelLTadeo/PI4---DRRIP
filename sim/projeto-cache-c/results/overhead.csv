@@ -17,3 +17,9 @@ L1D-C,8,32,4,DRRIP_champsim,6144,8
 L2-C,128,64,16,LRU,49152,64
 L2-C,128,64,16,DRRIP_jaleel,45056,32
 L2-C,128,64,16,DRRIP_champsim,45056,32
+L1D-Validacao,0,16,2,LRU,224,2
+L1D-Validacao,0,16,2,DRRIP_jaleel,232,4
+L1D-Validacao,0,16,2,DRRIP_champsim,232,4
+L2-Validacao,1,16,2,LRU,1600,2
+L2-Validacao,1,16,2,DRRIP_jaleel,1664,4
+L2-Validacao,1,16,2,DRRIP_champsim,1664,4

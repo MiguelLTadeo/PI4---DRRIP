@@ -1,0 +1,14 @@
+.claude
+
+# Artefatos de compilação C
+build/
+*.o
+*.a
+
+# Binários compilados (gerados por make)
+sim/projeto-cache-c/build/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo

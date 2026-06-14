@@ -3,11 +3,9 @@
  *
  * DRRIP fiel ao paper Jaleel et al. (ISCA 2010), com adaptações necessárias
  * para caches pequenas de FPGA:
- *   - PSEL inicia em PSEL_MAX/2 (centrado, sem viés)
+ *   - PSEL inicia em 0 (convenção DIP: SRRIP vence no início, conforme Jaleel 2010)
  *   - SDMs selecionados via shuffle DETERMINÍSTICO dentro do range [0, num_sets)
  *   - Contador BIP per-set (evita correlação entre SDM_BRRIP e followers)
- *
- * São as três correções identificadas durante a modelagem em Python.
  */
 #ifndef DRRIP_JALEEL_H
 #define DRRIP_JALEEL_H
@@ -20,7 +18,7 @@
 #define DRRIP_LONG_RRPV   2
 #define DRRIP_PSEL_WIDTH  10
 #define DRRIP_PSEL_MAX    1023
-#define DRRIP_PSEL_INIT   512    /* centro do range */
+#define DRRIP_PSEL_INIT   0      /* convenção DIP: SRRIP vence inicialmente */
 #define DRRIP_SDM_SIZE    32
 #define DRRIP_BIP_DENOM   32
 

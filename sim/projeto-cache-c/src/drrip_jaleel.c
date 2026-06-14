@@ -60,8 +60,8 @@ static int decide_policy(drrip_jaleel_t *d, int set_idx) {
     int kind = d->sdm_kind[set_idx];
     if (kind == 1) return 1;  /* SRRIP_SDM */
     if (kind == 2) return 2;  /* BRRIP_SDM */
-    /* follower: bit alto do PSEL decide */
-    return (d->psel >= DRRIP_PSEL_INIT) ? 2 : 1;  /* psel alto = BRRIP wins */
+    /* follower: MSB do PSEL decide (bit 9 de contador de 10 bits = valor > 511) */
+    return (d->psel > DRRIP_PSEL_MAX / 2) ? 2 : 1;  /* psel alto = BRRIP vence */
 }
 
 /* RRPV de inserção para BRRIP (contador per-set) */
